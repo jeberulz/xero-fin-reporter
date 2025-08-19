@@ -7,4 +7,39 @@ html,body{ background:var(--bg); color:var(--ink); }
 .x-subtle{ font-size:14px; color:#6B7280; }
 .x-btn{ display:inline-flex; align-items:center; justify-content:center; border-radius:.5rem; background:#0C9DD7; color:#fff; padding:.5rem .75rem; font-size:14px; font-weight:500 }
 .x-btn:hover{ background:#0A7FB0 }
+.x-btn:disabled{ background:#9CA3AF; cursor:not-allowed; }
 .x-pill{ display:inline-flex; align-items:center; border-radius:9999px; background:#E6F6FC; color:#0C9DD7; font-size:12px; padding:.25rem .625rem; font-weight:500 }
+
+/* AI Progress Animations */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progressPulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+.animate-progressPulse {
+  animation: progressPulse 2s ease-in-out infinite;
+}

@@ -2,15 +2,21 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Card, Table } from "../components/ui";
+import { AIProgress } from "../components/AIProgress";
 import { computePL } from "../lib/report";
 function fmt(n){ return `£${n.toLocaleString()}`; }
 export default function Page(){
-  const [pl,setPl]=useState(null); const [commentary,setCommentary]=useState(null); const [question,setQuestion]=useState(""); const [answer,setAnswer]=useState(""); const [loading,setLoading]=useState({ commentary: false, question: false });
+  const [pl,setPl]=useState(null); const [commentary,setCommentary]=useState(null); const [question,setQuestion]=useState(""); const [answer,setAnswer]=useState(""); const [loading,setLoading]=useState({ commentary: false, question: false }); const [showProgress,setShowProgress]=useState(false);
   useEffect(()=>{ fetch("/data/pl.json").then(r=>r.json()).then(setPl); },[]);
   if(!pl) return null;
   const months=pl.months; const totals=computePL(pl);
   const onExplain=async()=>{
+    setCommentary(null);
+    setShowProgress(true);
     setLoading(prev=>({...prev,commentary:true}));
+  };
+  
+  const handleProgressComplete=async()=>{
     try {
       const response = await fetch('/api/ai/commentary', {
         method: 'POST',
@@ -23,6 +29,7 @@ export default function Page(){
       console.error('Failed to get AI commentary:', error);
       setCommentary({ summary: "Failed to generate AI commentary. Please try again.", bullets: [] });
     } finally {
+      setShowProgress(false);
       setLoading(prev=>({...prev,commentary:false}));
     }
   };
@@ -62,11 +69,16 @@ export default function Page(){
       </div>
     </Card>
     <Card title="AI Commentary & Q&A">
-      {!commentary ? <div className="text-gray-500">Click "Explain with AI" to generate narrative commentary.</div> :
+      {showProgress ? (
+        <AIProgress isActive={showProgress} onComplete={handleProgressComplete} />
+      ) : !commentary ? (
+        <div className="text-gray-500">Click "Explain with AI" to generate narrative commentary.</div>
+      ) : (
         <div className="space-y-4">
           <div className="text-[15px] leading-6">{commentary.summary}</div>
           <ul className="list-disc pl-5 text-sm text-gray-700">{commentary.bullets.map((b,i)=>(<li key={i}>{b}</li>))}</ul>
-        </div>}
+        </div>
+      )}
       <div className="mt-6 border-t pt-4">
         <div className="x-title mb-2">Ask a question</div>
         <div className="flex items-center gap-2"><input value={question} onChange={e=>setQuestion(e.target.value)} className="w-full rounded-lg border-gray-200" placeholder="Why did utilities increase?" />
