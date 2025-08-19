@@ -43,3 +43,19 @@ html,body{ background:var(--bg); color:var(--ink); }
 .animate-progressPulse {
   animation: progressPulse 2s ease-in-out infinite;
 }
+
+/* Formatted Answer Styles */
+.border-l-3 {
+  border-left-width: 3px;
+}
+
+/* Enhanced typography for answers */
+.formatted-answer h4 {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.formatted-answer p {
+  line-height: 1.6;
+  color: #374151;
+}

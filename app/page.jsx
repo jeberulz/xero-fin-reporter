@@ -3,11 +3,42 @@
 import { useEffect, useState } from "react";
 import { Card, Table } from "../components/ui";
 import { AIProgress } from "../components/AIProgress";
+import { FormattedAnswer } from "../components/FormattedAnswer";
+import { QuestionHistory } from "../components/QuestionHistory";
 import { computePL } from "../lib/report";
 function fmt(n){ return `£${n.toLocaleString()}`; }
+function formatTime(timestamp) {
+  return new Date(timestamp).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 export default function Page(){
-  const [pl,setPl]=useState(null); const [commentary,setCommentary]=useState(null); const [question,setQuestion]=useState(""); const [answer,setAnswer]=useState(""); const [loading,setLoading]=useState({ commentary: false, question: false }); const [showProgress,setShowProgress]=useState(false);
-  useEffect(()=>{ fetch("/data/pl.json").then(r=>r.json()).then(setPl); },[]);
+  const [pl,setPl]=useState(null); const [commentary,setCommentary]=useState(null); const [question,setQuestion]=useState(""); const [answer,setAnswer]=useState(""); const [loading,setLoading]=useState({ commentary: false, question: false }); const [showProgress,setShowProgress]=useState(false); const [questionHistory,setQuestionHistory]=useState([]); const [showHistory,setShowHistory]=useState(false);
+  
+  useEffect(()=>{ 
+    fetch("/data/pl.json").then(r=>r.json()).then(setPl);
+    // Load history from localStorage
+    const savedHistory = localStorage.getItem('ai-question-history');
+    if (savedHistory) {
+      try {
+        setQuestionHistory(JSON.parse(savedHistory));
+      } catch (error) {
+        console.error('Failed to load question history:', error);
+      }
+    }
+  },[]);
+
+  // Save history to localStorage whenever it changes
+  useEffect(() => {
+    if (questionHistory.length > 0) {
+      localStorage.setItem('ai-question-history', JSON.stringify(questionHistory));
+    } else {
+      localStorage.removeItem('ai-question-history');
+    }
+  }, [questionHistory]);
   if(!pl) return null;
   const months=pl.months; const totals=computePL(pl);
   const onExplain=async()=>{
@@ -43,12 +74,37 @@ export default function Page(){
         body: JSON.stringify({ question, pl })
       });
       const result = await response.json();
+      const newHistoryItem = {
+        id: Date.now().toString(),
+        question: question.trim(),
+        answer: result.answer,
+        timestamp: Date.now()
+      };
+      setQuestionHistory(prev => [...prev, newHistoryItem]);
       setAnswer(result.answer);
+      setQuestion("");
     } catch (error) {
       console.error('Failed to get AI answer:', error);
       setAnswer("Failed to get AI response. Please try again.");
     } finally {
       setLoading(prev=>({...prev,question:false}));
+    }
+  };
+
+  const handleFollowUp = (originalQuestion) => {
+    setQuestion(`Following up on "${originalQuestion}": `);
+    setShowHistory(false);
+  };
+
+  const handleClearHistory = () => {
+    setQuestionHistory([]);
+    setAnswer("");
+  };
+
+  const handleDeleteQuestion = (id) => {
+    setQuestionHistory(prev => prev.filter(item => item.id !== id));
+    if (questionHistory.find(item => item.id === id)?.answer === answer) {
+      setAnswer("");
     }
   };
   return (<div className="grid md:grid-cols-2 gap-6">
@@ -80,10 +136,67 @@ export default function Page(){
         </div>
       )}
       <div className="mt-6 border-t pt-4">
-        <div className="x-title mb-2">Ask a question</div>
-        <div className="flex items-center gap-2"><input value={question} onChange={e=>setQuestion(e.target.value)} className="w-full rounded-lg border-gray-200" placeholder="Why did utilities increase?" />
-          <button className="x-btn" onClick={onAsk} disabled={loading.question || !question.trim()}>{loading.question ? "..." : "Ask"}</button></div>
-        {answer && <div className="mt-3 text-sm">{answer}</div>}
+        <div className="flex items-center justify-between mb-3">
+          <div className="x-title">Ask a question</div>
+          {questionHistory.length > 0 && (
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {showHistory ? 'Hide History' : `History (${questionHistory.length})`}
+            </button>
+          )}
+        </div>
+
+        {/* Question history */}
+        {showHistory && questionHistory.length > 0 && (
+          <div className="mb-4 bg-gray-50 rounded-lg p-4 border">
+            <QuestionHistory
+              history={questionHistory}
+              onClearHistory={handleClearHistory}
+              onDeleteQuestion={handleDeleteQuestion}
+              onFollowUp={handleFollowUp}
+              isLoading={loading.question}
+            />
+          </div>
+        )}
+
+        {/* Question input */}
+        <div className="flex items-center gap-2">
+          <input 
+            value={question} 
+            onChange={e=>setQuestion(e.target.value)} 
+            onKeyPress={e => e.key === 'Enter' && !loading.question && question.trim() && onAsk()}
+            className="w-full rounded-lg border-gray-200 text-sm" 
+            placeholder="Why did utilities increase?" 
+          />
+          <button 
+            className="x-btn" 
+            onClick={onAsk} 
+            disabled={loading.question || !question.trim()}
+          >
+            {loading.question ? "..." : "Ask"}
+          </button>
+        </div>
+
+        {/* Current answer display */}
+        {answer && (
+          <div className="mt-4 p-5 bg-gradient-to-br from-gray-50 to-blue-50/30 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <div className="text-sm font-semibold text-gray-800">Latest AI Analysis</div>
+              </div>
+              <div className="text-xs text-gray-500">
+                {questionHistory.length > 0 && formatTime(questionHistory[questionHistory.length - 1]?.timestamp)}
+              </div>
+            </div>
+            <FormattedAnswer answer={answer} />
+          </div>
+        )}
       </div>
     </Card>
   </div>);
